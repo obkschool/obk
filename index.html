@@ -16,7 +16,6 @@
         <a href="index.html" class="logo">مدرسة عمر بن الخطاب الثانوية</a>
         <div class="nav-links">
           <a href="index.html" class="nav-btn active">المحادثة</a>
-          <a href="game.html" class="nav-btn">الألعاب التعليمية</a>
         </div>
       </div>
       <div class="nav-progress-bar"></div>
@@ -77,5 +76,43 @@
       </div>
     </div>
     <script src="script.js"></script>
+    <!-- Check if the browser supports the Web Speech API -->
+    <script>
+      if ('webkitSpeechRecognition' in window) {
+        const recognition = new webkitSpeechRecognition();
+        recognition.lang = 'ar-SA'; // Set the language to Arabic
+        recognition.continuous = false; // Stop automatically after a single recognition
+        recognition.interimResults = false; // Do not show interim results
+
+        const startMicButton = document.getElementById('start-mic');
+        const transcriptDiv = document.getElementById('transcript');
+
+        startMicButton.addEventListener('click', () => {
+          // Ask for microphone permission
+          recognition.start();
+        });
+
+        recognition.onstart = () => {
+          console.log('Voice recognition started. Try speaking into the microphone.');
+        };
+
+        recognition.onspeechend = () => {
+          console.log('Voice recognition ended.');
+          recognition.stop();
+        };
+
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          console.log('Transcript:', transcript);
+          transcriptDiv.textContent = `You said: ${transcript}`;
+        };
+
+        recognition.onerror = (event) => {
+          console.error('Error occurred in recognition:', event.error);
+        };
+      } else {
+        console.error('Web Speech API is not supported in this browser.');
+      }
+    </script>
   </body>
 </html>
