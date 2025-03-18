@@ -176,3 +176,149 @@ promptForm.querySelector("#add-file-btn").addEventListener("click", () => fileIn
 // Add copyright info to console
 console.log("بدعم من مدرسة عمر بن الخطاب الثانوية");
 console.log("© جميع الحقوق محفوظة لمدرسة عمر بن الخطاب الثانوية");
+
+function setupSpeechRecognition() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    console.error('Speech recognition not supported');
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+
+  recognition.lang = 'ar-SA';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  const promptWrapper = document.querySelector('.prompt-wrapper');
+  const micButton = document.createElement('button');
+  micButton.id = 'mic-button';
+  micButton.className = 'material-symbols-rounded';
+  micButton.textContent = 'mic';
+
+  const waveContainer = document.createElement('div');
+  waveContainer.id = 'wave-container';
+  waveContainer.className = 'wave-container hidden';
+  for (let i = 0; i < 5; i++) {
+    const wave = document.createElement('div');
+    wave.className = 'wave';
+    waveContainer.appendChild(wave);
+  }
+
+  const stopButton = document.createElement('button');
+  stopButton.id = 'stop-recording';
+  stopButton.className = 'material-symbols-rounded hidden';
+  stopButton.textContent = 'stop_circle';
+  
+  promptWrapper.insertBefore(waveContainer, document.getElementById('delete-chats-btn'));
+  promptWrapper.insertBefore(stopButton, document.getElementById('delete-chats-btn'));
+  promptWrapper.insertBefore(micButton, document.getElementById('delete-chats-btn'));
+
+  const promptInput = document.querySelector('.prompt-input');
+  let hasPermission = localStorage.getItem('microphonePermission') === 'granted';
+  let currentTranscript = '';
+  let isRecording = false;
+
+  async function requestMicrophonePermission() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      hasPermission = true;
+      localStorage.setItem('microphonePermission', 'granted');
+      return true;
+    } catch (error) {
+      console.error('Microphone permission denied:', error);
+      localStorage.setItem('microphonePermission', 'denied');
+      alert('يرجى السماح بالوصول إلى الميكروفون لاستخدام ميزة التعرف على الصوت.');
+      return false;
+    }
+  }
+
+  function startRecording() {
+    if (!isRecording) {
+      isRecording = true;
+      micButton.classList.add('hidden');
+      waveContainer.classList.remove('hidden');
+      stopButton.classList.remove('hidden');
+      promptInput.placeholder = 'جاري الاستماع...';
+      currentTranscript = '';
+      recognition.start();
+    }
+  }
+
+  function stopRecording() {
+    if (isRecording) {
+      isRecording = false;
+      recognition.stop();
+      micButton.classList.remove('hidden');
+      waveContainer.classList.add('hidden');
+      stopButton.classList.add('hidden');
+      promptInput.placeholder = 'اسأل OBK AI';
+      
+      // Only submit if there's actual content
+      if (currentTranscript.trim()) {
+        const form = promptInput.closest('form');
+        if (form) form.dispatchEvent(new Event('submit'));
+      }
+    }
+  }
+
+  micButton.addEventListener('click', async () => {
+    if (!hasPermission) {
+      const permitted = await requestMicrophonePermission();
+      if (!permitted) return;
+    }
+
+    try {
+      startRecording();
+    } catch (error) {
+      if (error.name === 'NotAllowedError') {
+        localStorage.removeItem('microphonePermission');
+        hasPermission = false;
+        alert('تم إلغاء إذن الميكروفون. يرجى المحاولة مرة أخرى.');
+      } else {
+        console.error('Error starting recognition:', error);
+      }
+    }
+  });
+
+  stopButton.addEventListener('click', stopRecording);
+
+  recognition.onstart = () => {
+    console.log('Speech recognition started');
+  };
+
+  recognition.onend = () => {
+    console.log('Speech recognition ended');
+    // Only restart if we're still recording
+    if (isRecording) {
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error('Error restarting recognition:', error);
+        stopRecording();
+      }
+    }
+  };
+
+  recognition.onresult = (event) => {
+    currentTranscript = Array.from(event.results)
+      .map(result => result[0])
+      .map(result => result.transcript)
+      .join('');
+
+    promptInput.value = currentTranscript;
+  };
+
+  recognition.onerror = (event) => {
+    console.error('Speech recognition error:', event.error);
+    if (event.error === 'not-allowed') {
+      localStorage.removeItem('microphonePermission');
+      hasPermission = false;
+      alert('يرجى السماح بالوصول إلى الميكروفون لاستخدام ميزة التعرف على الصوت.');
+    }
+    stopRecording();
+  };
+}
+
+document.addEventListener('DOMContentLoaded', setupSpeechRecognition);
